@@ -1,0 +1,22 @@
+{
+ "what": "terminal export of an append-only transparency log",
+ "origin": "markovianprotocol.com/log",
+ "final_tree_size": 7123,
+ "final_root_b64": "8ALXa+5XcjjgCbagmKwDcZcXxxdqNvRIVkcW8jwOcz8=",
+ "leaves_exported": 7123,
+ "checkpoint_lines": 16,
+ "anchored_checkpoints": 584,
+ "exported_at_unix": 1786024045,
+ "verify": "python3 verify_export.py  (stdlib only, no network)",
+ "proves": [
+  "that these leaf bytes, in this order, produce the final root",
+  "that the log key signed that root at this size",
+  "that the listed witnesses cosigned the same root",
+  "that any receipt naming an index <= final_tree_size can be rechecked against this frozen tree"
+ ],
+ "does_not_prove": [
+  "that the recorded claims are true",
+  "that the log was complete (nothing withheld)",
+  "that the log key belonged to any particular operator - key-to-identity binding is a social fact this bundle freezes but cannot establish"
+ ]
+}
