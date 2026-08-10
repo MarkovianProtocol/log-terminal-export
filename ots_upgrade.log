@@ -1,0 +1,20 @@
+Calendar https://btc.calendar.catallaxy.com: Pending confirmation in Bitcoin blockchain
+Calendar https://alice.btc.calendar.opentimestamps.org: Timestamped by transaction b8f3f7df2def18beff5455e25616c5f93b9aff0031fac60acefb80ceffb24542; waiting for 6 confirmations
+Calendar https://bob.btc.calendar.opentimestamps.org: Timestamped by transaction 3acc3c93e36d9dd36edaac9d74c0e52bcba113e6b10886bdbcde802ad8b54bb0; waiting for 6 confirmations
+Failed! Timestamp not complete
+Got 1 attestation(s) from https://btc.calendar.catallaxy.com
+Got 1 attestation(s) from https://alice.btc.calendar.opentimestamps.org
+Got 1 attestation(s) from https://bob.btc.calendar.opentimestamps.org
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
+Success! Timestamp complete
