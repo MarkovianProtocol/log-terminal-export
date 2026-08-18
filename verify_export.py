@@ -313,6 +313,58 @@ def _elide(items, n=5):
     return ", ".join(items[:n]) + more
 
 
+_ML_DSA_44_COSIG = 2432          # 4-byte key id + 8-byte timestamp + 2420-byte sig
+
+
+def classify(sigs, origin, body, keys):
+    """Sort a checkpoint's signature lines into what they are worth.
+
+    The log signing its own checkpoint proves the operator held the key. It is
+    not evidence against the operator, so it can never count toward a quorum --
+    a single-signer log can keep two sets of books, one tree for you and a
+    different one for whoever checks later, and sign both. Only signatures from
+    parties who are not the log make the books singular.
+
+    Returns (log_verified, independent_verified, failed, unverifiable, malformed).
+    A line is 'unverifiable' only at exactly the ML-DSA-44 cosignature length;
+    anything else off-shape is malformed and fails. Classifying by length alone
+    would let an attacker retire an inconvenient signature by padding it a byte."""
+    log_ok, independent, failed, unverifiable, malformed = 0, [], [], [], []
+    for line in sigs:
+        parts = line.split(" ", 2)
+        name = parts[1] if len(parts) > 2 else "?"
+        try:
+            blen = len(base64.b64decode(parts[2]))
+        except Exception:
+            blen = -1
+        if blen == _ML_DSA_44_COSIG:
+            unverifiable.append(name)
+            continue
+        if blen not in (68, 76):
+            malformed.append("%s (%d bytes, not a signature shape this tool knows)"
+                             % (name, blen))
+            continue
+        if not sig_ok(body, line, keys):
+            failed.append(name)
+        elif name == origin:
+            log_ok += 1
+        else:
+            independent.append(name)
+    return log_ok, independent, failed, unverifiable, malformed
+
+
+def stated_quorum():
+    """The witness quorum this log published for itself. A bundle that states no
+    policy cannot be checked against one, so its absence is a failure rather
+    than a default."""
+    try:
+        d = json.loads(_read("trust-root.json").decode())
+        q = int(d["witness_quorum"])
+        return q if q > 0 else None
+    except Exception:
+        return None
+
+
 def check_anchored_history(leaves, keys):
     """Every anchored checkpoint must be a prefix of *these* leaves.
 
@@ -350,29 +402,68 @@ def check_anchored_history(leaves, keys):
 
     roots = prefix_roots(leaves, [p[2] for p in parsed])
     unstamped, unsigned, forked = [], [], []
+    witnessed = {}                       # size -> independent cosignatures verified
     for f, o, n, r, ss, text in parsed:
         if base64.b64encode(roots[n]).decode() != r:
             forked.append("%s root %s != prefix root %s"
                           % (f, show(r), show(base64.b64encode(roots[n]).decode())))
         body = chr(10).join(text.split(chr(10))[:3]) + chr(10)
+        _, ind, _, _, _ = classify(ss, o, body, keys)
+        witnessed[n] = len(ind)
         if not any(sig_ok(body, l, keys) for l in ss
                    if l.split(" ", 2)[1:2] == [o]):
             unsigned.append(f)
         if not os.path.exists(os.path.join(d, f + ".ots")):
             unstamped.append(f)
 
+    # Witnessing started partway through this log's life, so the earliest
+    # anchors carry no cosignatures. That is a fact about the history, not a
+    # defect, but it has to be stated rather than passed over: below the first
+    # witnessed size the anchor rests on the operator's signature alone.
+    quorum = stated_quorum()
+    met = sorted(n for n, c in witnessed.items() if quorum and c >= quorum)
+    first_witnessed = met[0] if met else None
+    short = sorted(n for n, c in witnessed.items()
+                   if first_witnessed is not None and n >= first_witnessed
+                   and c < quorum)
+
     print("anchored checkpoints: %d" % len(names))
     for line in bad + forked:
         print("  FAIL  %s" % line)
     if unsigned:
         print("  FAIL  no verifying log signature: %s" % _elide(unsigned))
-    ok = not (bad or forked or unsigned)
+    if quorum is None:
+        print("  FAIL  trust-root.json states no witness quorum, so the "
+              "cosignatures on these anchors cannot be judged against a policy")
+    elif first_witnessed is None:
+        print("  FAIL  not one of these %d anchored checkpoints carries the "
+              "stated quorum of %d independent cosignatures; the whole anchored "
+              "history rests on the log's own key" % (len(names), quorum))
+    elif short:
+        print("  FAIL  %d anchor(s) at or above size %d carry fewer than the "
+              "stated quorum of %d independent cosignatures: %s"
+              % (len(short), first_witnessed, quorum,
+                 _elide(["%d (%d)" % (n, witnessed[n]) for n in short])))
+    ok = (not (bad or forked or unsigned or short)
+          and quorum is not None and first_witnessed is not None)
     if ok:
         print("  PASS  each equals the prefix root of these leaves at its stated"
               " size, under a verifying log signature")
+        unwitnessed = sorted(n for n in witnessed if n < first_witnessed)
+        if unwitnessed:
+            print("  PASS  %d of %d carry %d or more independent cosignatures; "
+                  "the %d below size %d predate witnessing and rest on the log's "
+                  "own signature alone"
+                  % (len(names) - len(unwitnessed), len(names), quorum,
+                     len(unwitnessed), first_witnessed))
+        else:
+            print("  PASS  all %d carry %d or more independent cosignatures"
+                  % (len(names), quorum))
     if unstamped:
-        # Not a failure of the export: an OTS proof can lag its checkpoint.
-        print("  note  %d without an OpenTimestamps proof: %s"
+        # Presence of an .ots is all this tool checks -- verifying an
+        # OpenTimestamps attestation needs Bitcoin headers and a network, and
+        # this verifier has neither. See does_not_prove in manifest.json.
+        print("  note  %d without an OpenTimestamps proof file: %s"
               % (len(unstamped), _elide(unstamped)))
     return ok
 
@@ -423,27 +514,49 @@ def main():
 
     body = chr(10).join(ck.split(chr(10))[:3]) + chr(10)
     keys = load_keys()
-    ed, pq, failed = 0, 0, []
-    for line in sigs:
-        parts = line.split(" ", 2)
-        name = parts[1] if len(parts) > 1 else "?"
-        try:
-            blen = len(base64.b64decode(parts[2]))
-        except Exception:
-            blen = 0
-        if blen not in (68, 76):
-            pq += 1
-            print("  skip  %-50s post-quantum cosignature (%d bytes)" % (name[:50], blen))
-            continue
-        if sig_ok(body, line, keys):
-            ed += 1
-            print("  PASS  %s" % name[:60])
-        else:
-            failed.append(name)
-            print("  FAIL  %-50s no bundled key verifies it" % name[:50])
-    print("Ed25519 signatures verified: %d of %d checkable (%d post-quantum skipped)"
-          % (ed, ed + len(failed), pq))
-    if ed == 0:
+    quorum = stated_quorum()
+    log_ok, independent, failed, unverifiable, malformed = classify(
+        sigs, origin, body, keys)
+
+    for name in independent:
+        print("  PASS  %-52s independent witness" % name[:52])
+    if log_ok:
+        print("  PASS  %-52s the log's own key" % origin[:52])
+    for name in failed:
+        print("  FAIL  %-52s no bundled key verifies it" % name[:52])
+    for item in malformed:
+        print("  FAIL  %s" % item)
+    for name in unverifiable:
+        print("  ----  %-52s ML-DSA-44, no key for it in this bundle"
+              % name[:52])
+
+    # The count that matters is the independent one. The log's own signature is
+    # reported separately and never added to it: it says the operator held the
+    # key, which is not evidence about the operator.
+    print("log signature: %s" % ("verifies" if log_ok else "MISSING"))
+    print("independent witness cosignatures verified: %d (quorum %s)"
+          % (len(independent), quorum if quorum is not None else "UNSTATED"))
+    if unverifiable:
+        print("post-quantum lines present but uncheckable here: %d "
+              "(no ML-DSA-44 verifier and no key for them in this bundle)"
+              % len(unverifiable))
+
+    if failed or malformed:
+        ok = False
+    if not log_ok:
+        print("FAIL the log's own signature over this checkpoint does not verify")
+        ok = False
+    if quorum is None:
+        print("FAIL trust-root.json states no witness quorum, so this "
+              "checkpoint cannot be judged against a policy")
+        ok = False
+    elif len(independent) < quorum:
+        print("FAIL %d independent cosignature(s), below the stated quorum of %d."
+              % (len(independent), quorum))
+        print("     Without a quorum this bundle shows only that whoever held "
+              "the log key signed these bytes. A single-signer log can keep two")
+        print("     sets of books and sign both; independent witnesses are what "
+              "make the books singular.")
         ok = False
 
     # spot-check an inclusion proof against the frozen tree
