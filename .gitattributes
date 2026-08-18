@@ -1,0 +1,6 @@
+# The signed bytes are the bytes. A checkpoint's signature covers the exact
+# line endings it was signed over, so no file in this export may be rewritten
+# in transport. Git for Windows defaults to core.autocrlf=true, which would
+# otherwise put a \r on every line of checkpoint.txt and break verification
+# on a fresh clone.
+* -text

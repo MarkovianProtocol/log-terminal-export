@@ -148,6 +148,32 @@ def merkle_tree_hash(leaves):
     k = _split_point(n)
     return _node_hash(merkle_tree_hash(leaves[:k]), merkle_tree_hash(leaves[k:]))
 
+def prefix_roots(leaves, wanted):
+    """MTH(leaves[:n]) for every n in `wanted`, in one pass over the leaves.
+
+    Recomputing merkle_tree_hash for each of ~660 anchored sizes separately is
+    O(sizes x n). Instead carry the perfect subtrees on a stack as leaves are
+    appended; the root at size n is those subtrees folded right to left, which
+    is the same value the split-point recursion produces."""
+    wanted = set(wanted)
+    out = {}
+    if 0 in wanted:
+        out[0] = hashlib.sha256(b"").digest()
+    stack = []                                  # [(width, hash)], left to right
+    for i, leaf in enumerate(leaves, 1):
+        node = (1, _leaf_hash(leaf))
+        while stack and stack[-1][0] == node[0]:
+            left = stack.pop()
+            node = (left[0] * 2, _node_hash(left[1], node[1]))
+        stack.append(node)
+        if i in wanted:
+            h = stack[-1][1]
+            for j in range(len(stack) - 2, -1, -1):
+                h = _node_hash(stack[j][1], h)
+            out[i] = h
+    return out
+
+
 def inclusion_proof(leaves, index):
     n = len(leaves)
     if not 0 <= index < n:
@@ -187,6 +213,26 @@ def _read(p):
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def crlf_files(names):
+    """Files whose bytes carry a carriage return. Everything here is covered by
+    a signature, so a \\r added in transport changes what is being verified."""
+    out = []
+    for n in names:
+        try:
+            if b"\r" in _read(n):
+                out.append(n)
+        except OSError:
+            continue
+    return out
+
+
+def show(s):
+    """repr, not the bare string: a trailing \\r makes two different values
+    render identically in a terminal, so 'computed X / expected X' would be
+    printed for a genuine mismatch."""
+    return repr(s)
 
 
 def parse_checkpoint(text):
@@ -262,7 +308,91 @@ def sig_ok(body, sig_line, keys):
     return False
 
 
+def _elide(items, n=5):
+    more = " (+%d more)" % (len(items) - n) if len(items) > n else ""
+    return ", ".join(items[:n]) + more
+
+
+def check_anchored_history(leaves, keys):
+    """Every anchored checkpoint must be a prefix of *these* leaves.
+
+    Without this the bundle proves only that the final head is well formed --
+    a snapshot. Checking each anchored checkpoint's root against the prefix
+    root at its own stated size ties the whole anchored history to these
+    bytes, which is what makes it a terminal export."""
+    d = os.path.join(HERE, "anchors")
+    if not os.path.isdir(d):
+        print("FAIL anchors/ missing: no anchored history to check")
+        return False
+
+    names = sorted((f for f in os.listdir(d) if f.endswith(".checkpoint")),
+                   key=lambda f: int(f.split(".")[0]))
+    if not names:
+        print("FAIL anchors/ contains no checkpoints")
+        return False
+
+    parsed, bad = [], []
+    for f in names:
+        try:
+            text = open(os.path.join(d, f), "rb").read().decode()
+            o, n, r, ss = parse_checkpoint(text)
+        except Exception as e:
+            bad.append("%s unreadable (%s)" % (f, e))
+            continue
+        if n != int(f.split(".")[0]):
+            bad.append("%s states size %d" % (f, n))
+            continue
+        if n > len(leaves):
+            bad.append("%s size %d exceeds the exported %d leaves"
+                       % (f, n, len(leaves)))
+            continue
+        parsed.append((f, o, n, r, ss, text))
+
+    roots = prefix_roots(leaves, [p[2] for p in parsed])
+    unstamped, unsigned, forked = [], [], []
+    for f, o, n, r, ss, text in parsed:
+        if base64.b64encode(roots[n]).decode() != r:
+            forked.append("%s root %s != prefix root %s"
+                          % (f, show(r), show(base64.b64encode(roots[n]).decode())))
+        body = chr(10).join(text.split(chr(10))[:3]) + chr(10)
+        if not any(sig_ok(body, l, keys) for l in ss
+                   if l.split(" ", 2)[1:2] == [o]):
+            unsigned.append(f)
+        if not os.path.exists(os.path.join(d, f + ".ots")):
+            unstamped.append(f)
+
+    print("anchored checkpoints: %d" % len(names))
+    for line in bad + forked:
+        print("  FAIL  %s" % line)
+    if unsigned:
+        print("  FAIL  no verifying log signature: %s" % _elide(unsigned))
+    ok = not (bad or forked or unsigned)
+    if ok:
+        print("  PASS  each equals the prefix root of these leaves at its stated"
+              " size, under a verifying log signature")
+    if unstamped:
+        # Not a failure of the export: an OTS proof can lag its checkpoint.
+        print("  note  %d without an OpenTimestamps proof: %s"
+              % (len(unstamped), _elide(unstamped)))
+    return ok
+
+
 def main():
+    ok = True
+
+    bad_eol = crlf_files(["checkpoint.txt", "leaves.jsonl", "log_vkey.txt",
+                          "witness_keys.json"])
+    if bad_eol:
+        print("FAIL carriage returns in: %s" % ", ".join(bad_eol))
+        print("     These bytes are covered by a signature, so a \\r inserted in")
+        print("     transport changes what is verified and every check below will")
+        print("     fail for that reason and no other. Git for Windows defaults to")
+        print("     core.autocrlf=true; this export ships a .gitattributes with")
+        print("     '* -text' to prevent it, so a clone predating that file is the")
+        print("     likely cause. Re-clone, or run:")
+        print("       git -c core.autocrlf=false clone <url>")
+        ok = False
+
     ck = _read("checkpoint.txt").decode()
     origin, size, root_b64, sigs = parse_checkpoint(ck)
     print("checkpoint: origin=%s size=%d" % (origin, size))
@@ -275,7 +405,6 @@ def main():
             leaves.append(base64.b64decode(r["data_b64"]))
     print("leaves in export: %d" % len(leaves))
 
-    ok = True
     if len(leaves) != size:
         print("FAIL leaf count %d != checkpoint size %d" % (len(leaves), size))
         ok = False
@@ -285,8 +414,11 @@ def main():
     if computed_b64 == root_b64:
         print("PASS recomputed root matches the checkpoint root")
     else:
-        print("FAIL root mismatch\n  computed %s\n  checkpoint %s"
-              % (computed_b64, root_b64))
+        print("FAIL root mismatch\n  computed   %s\n  checkpoint %s"
+              % (show(computed_b64), show(root_b64)))
+        if computed_b64 == root_b64.strip():
+            print("     The two differ only in surrounding whitespace, so the file")
+            print("     was rewritten in transport rather than the tree being wrong.")
         ok = False
 
     body = chr(10).join(ck.split(chr(10))[:3]) + chr(10)
@@ -333,6 +465,8 @@ def main():
         print("inclusion proof for leaf %d: %s"
               % (i, "PASS" if h == computed else "FAIL"))
         ok = ok and h == computed
+
+    ok = check_anchored_history(leaves, keys) and ok
 
     print("\n%s" % ("EXPORT VERIFIES" if ok else "EXPORT FAILED"))
     sys.exit(0 if ok else 1)
