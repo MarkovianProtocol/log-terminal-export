@@ -353,6 +353,31 @@ def classify(sigs, origin, body, keys):
     return log_ok, independent, failed, unverifiable, malformed
 
 
+def pq_keys():
+    """Shipped ML-DSA-44 verifier keys, indexed by name -> (key_id, alg, pubkey).
+
+    Verifying these signatures needs an ML-DSA-44 implementation the standard
+    library does not have, so this tool cannot check them. What it can do in
+    stdlib is recompute each key id from the key material and bind it to the
+    line that carries it, which settles for good *which* key signed -- the
+    question that otherwise dies with the operator's machine."""
+    out = {}
+    try:
+        d = json.loads(_read("pq_keys.json").decode())
+    except Exception:
+        return out
+    for e in d.get("keys", []):
+        try:
+            name, _, b64 = e["vkey"].split("+", 2)
+            blob = base64.b64decode(b64 + "=" * (-len(b64) % 4))
+            kid = hashlib.sha256(name.encode() + b"\x0a" + blob[:1]
+                                 + blob[1:]).digest()[:4]
+            out[name] = (kid, blob[0], blob[1:])
+        except Exception:
+            continue
+    return out
+
+
 def stated_quorum():
     """The witness quorum this log published for itself. A bundle that states no
     policy cannot be checked against one, so its absence is a failure rather
@@ -526,9 +551,32 @@ def main():
         print("  FAIL  %-52s no bundled key verifies it" % name[:52])
     for item in malformed:
         print("  FAIL  %s" % item)
-    for name in unverifiable:
-        print("  ----  %-52s ML-DSA-44, no key for it in this bundle"
-              % name[:52])
+    pq = pq_keys()
+    pq_bound, pq_unkeyed, pq_mismatch = 0, [], []
+    for line in sigs:
+        parts = line.split(" ", 2)
+        if len(parts) < 3:
+            continue
+        name = parts[1]
+        try:
+            blob = base64.b64decode(parts[2])
+        except Exception:
+            continue
+        if len(blob) != _ML_DSA_44_COSIG:
+            continue
+        if name not in pq:
+            pq_unkeyed.append(name)
+            print("  ----  %-52s ML-DSA-44, no key for it in this bundle"
+                  % name[:52])
+        elif pq[name][0] == blob[:4]:
+            pq_bound += 1
+            print("  ----  %-52s ML-DSA-44 under shipped key %s (needs an "
+                  "ML-DSA-44 verifier)" % (name[:52], pq[name][0].hex()))
+        else:
+            pq_mismatch.append(name)
+            print("  FAIL  %-52s ML-DSA-44 line names key %s, but the key "
+                  "shipped for it is %s"
+                  % (name[:52], blob[:4].hex(), pq[name][0].hex()))
 
     # The count that matters is the independent one. The log's own signature is
     # reported separately and never added to it: it says the operator held the
@@ -537,11 +585,15 @@ def main():
     print("independent witness cosignatures verified: %d (quorum %s)"
           % (len(independent), quorum if quorum is not None else "UNSTATED"))
     if unverifiable:
-        print("post-quantum lines present but uncheckable here: %d "
-              "(no ML-DSA-44 verifier and no key for them in this bundle)"
-              % len(unverifiable))
+        print("ML-DSA-44 lines: %d, of which %d carry a key shipped in this "
+              "bundle and bound to them by key id. Checking the signatures "
+              "themselves needs an ML-DSA-44 implementation; see pq_keys.json "
+              "for the algorithm, the message format, and the keys."
+              % (len(unverifiable), pq_bound))
+        if pq_unkeyed:
+            print("     no key shipped for: %s" % _elide(pq_unkeyed))
 
-    if failed or malformed:
+    if failed or malformed or pq_mismatch:
         ok = False
     if not log_ok:
         print("FAIL the log's own signature over this checkpoint does not verify")
