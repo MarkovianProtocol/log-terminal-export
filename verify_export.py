@@ -514,12 +514,26 @@ def main():
     print("checkpoint: origin=%s size=%d" % (origin, size))
     print("signature lines: %d" % len(sigs))
 
-    leaves = []
-    for line in _read("leaves.jsonl").decode().splitlines():
-        if line.strip():
-            r = json.loads(line)
-            leaves.append(base64.b64decode(r["data_b64"]))
+    # Each record states its own index. Renumbering those fields leaves the
+    # bytes and their order untouched, so the tree still recomputes and every
+    # signature still verifies -- while every lookup by index quietly returns
+    # the wrong leaf. Rechecking a receipt by index is the one thing this bundle
+    # exists to support, so the numbering is checked rather than discarded.
+    leaves, misnumbered = [], []
+    for pos, line in enumerate(l for l in _read("leaves.jsonl").decode().splitlines()
+                               if l.strip()):
+        r = json.loads(line)
+        if r.get("index") != pos:
+            misnumbered.append("position %d states index %r" % (pos, r.get("index")))
+        leaves.append(base64.b64decode(r["data_b64"]))
     print("leaves in export: %d" % len(leaves))
+    if misnumbered:
+        print("FAIL leaves.jsonl is misnumbered: %s" % _elide(misnumbered, 3))
+        print("     The tree and every signature over it are unaffected, which is")
+        print("     why this has to be checked separately: a receipt naming an")
+        print("     index would resolve to the wrong leaf and nothing else would")
+        print("     notice.")
+        ok = False
 
     if len(leaves) != size:
         print("FAIL leaf count %d != checkpoint size %d" % (len(leaves), size))
