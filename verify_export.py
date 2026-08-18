@@ -148,32 +148,6 @@ def merkle_tree_hash(leaves):
     k = _split_point(n)
     return _node_hash(merkle_tree_hash(leaves[:k]), merkle_tree_hash(leaves[k:]))
 
-def prefix_roots(leaves, wanted):
-    """MTH(leaves[:n]) for every n in `wanted`, in one pass over the leaves.
-
-    Recomputing merkle_tree_hash for each of ~660 anchored sizes separately is
-    O(sizes x n). Instead carry the perfect subtrees on a stack as leaves are
-    appended; the root at size n is those subtrees folded right to left, which
-    is the same value the split-point recursion produces."""
-    wanted = set(wanted)
-    out = {}
-    if 0 in wanted:
-        out[0] = hashlib.sha256(b"").digest()
-    stack = []                                  # [(width, hash)], left to right
-    for i, leaf in enumerate(leaves, 1):
-        node = (1, _leaf_hash(leaf))
-        while stack and stack[-1][0] == node[0]:
-            left = stack.pop()
-            node = (left[0] * 2, _node_hash(left[1], node[1]))
-        stack.append(node)
-        if i in wanted:
-            h = stack[-1][1]
-            for j in range(len(stack) - 2, -1, -1):
-                h = _node_hash(stack[j][1], h)
-            out[i] = h
-    return out
-
-
 def inclusion_proof(leaves, index):
     n = len(leaves)
     if not 0 <= index < n:
@@ -204,6 +178,32 @@ _EM_DASH = "—"
 _LOG_ALG = 0x01          # Ed25519 log signature
 _COSIG_ALG = 0x04        # Ed25519 cosignature/v1 (domain-separated from 0x01)
 
+
+
+def prefix_roots(leaves, wanted):
+    """MTH(leaves[:n]) for every n in `wanted`, in one pass over the leaves.
+
+    Recomputing merkle_tree_hash for each of ~660 anchored sizes separately is
+    O(sizes x n). Instead carry the perfect subtrees on a stack as leaves are
+    appended; the root at size n is those subtrees folded right to left, which
+    is the same value the split-point recursion produces."""
+    wanted = set(wanted)
+    out = {}
+    if 0 in wanted:
+        out[0] = hashlib.sha256(b"").digest()
+    stack = []                                  # [(width, hash)], left to right
+    for i, leaf in enumerate(leaves, 1):
+        node = (1, _leaf_hash(leaf))
+        while stack and stack[-1][0] == node[0]:
+            left = stack.pop()
+            node = (left[0] * 2, _node_hash(left[1], node[1]))
+        stack.append(node)
+        if i in wanted:
+            h = stack[-1][1]
+            for j in range(len(stack) - 2, -1, -1):
+                h = _node_hash(stack[j][1], h)
+            out[i] = h
+    return out
 
 
 # ---------------------------------------------------------------- verifier
