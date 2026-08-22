@@ -390,6 +390,15 @@ def stated_quorum():
         return None
 
 
+def distinct_hosts(names):
+    """Witness names are c2sp origins: a host, optionally then a path. Two keys under
+    one host are one machine and one operator, so counting keys overstates how many
+    parties actually saw the tree. Grouping by host is mechanical and checkable;
+    grouping by organisation would need a curated table and a judgment call, so this
+    reports what it can compute and says plainly what it cannot."""
+    return {n.split("/", 1)[0] for n in names}
+
+
 def check_manifest(leaves, size, root_b64):
     """manifest.json describes this bundle in prose and numbers. Nothing else here
     reads it, so until now a wrong number in it verified clean: an export shipped
@@ -627,6 +636,16 @@ def main():
     print("log signature: %s" % ("verifies" if log_ok else "MISSING"))
     print("independent witness cosignatures verified: %d (quorum %s)"
           % (len(independent), quorum if quorum is not None else "UNSTATED"))
+    hosts = distinct_hosts(independent)
+    print("   ...held by %d distinct host name(s): %s"
+          % (len(hosts), ", ".join(sorted(hosts))))
+    if len(hosts) < len(independent):
+        print("   Fewer hosts than cosignatures: some keys above share a host, so")
+        print("   they are not independent of each other. Count hosts, not keys.")
+    print("   A host is not an operator. Two hosts can be one organisation, and")
+    print("   this bundle cannot tell you which: that is a social fact, like the")
+    print("   key-to-identity binding under does_not_prove. The count above is an")
+    print("   upper bound on independence, never a floor.")
     if unverifiable:
         print("ML-DSA-44 lines: %d, of which %d carry a key shipped in this "
               "bundle and bound to them by key id. Checking the signatures "

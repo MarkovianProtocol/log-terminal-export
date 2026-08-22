@@ -1,0 +1,41 @@
+{
+  "manifest": "markovian-trust-root/v1",
+  "version": 1,
+  "origin": "markovianprotocol.com/log",
+  "log_vkeys": {
+    "ed25519": "markovianprotocol.com/log+0302c6c8+ATkpOWo95UuEiW2EhNZAol4f0CS8hMluJfPcTSzrr03v"
+  },
+  "witness_vkeys": [
+    "witness.stagemole.eu+67f7aea0+BEqSG3yu9YrmcM3BHvQYTxwFj3uSWakQepafafpUqklv",
+    "transparency.dev/DEV:witness-little-garden+d8042a87+BCtusOxINQNUTN5Oj8HObRkh2yHf/MwYaGX4CPdiVEPM",
+    "staging.witness.transparency.goog/ring-any-bells+2e1a8dc9+BG5JTpLc3FJtwzgh1Uv+Qelz9qeOH2bfWjS1s0s+y4rL",
+    "rgdd.se/poc-witness+db03732e+BCjJKlo6BU0xfIb8LutqerIFTWIXEA0L5n3tW3QyPFgG",
+    "witness1.smartit.nu/witness1+a48c820f+BPSFWg9G6KPiO7QPryYO5Xq4oYJJ+kAvLKLSimDhoxMO",
+    "remora.n621.de+da77ade7+BOvN63jn/bLvkieywe8R6UYAtVtNbZpXh34x7onlmtw2",
+    "witness.navigli.sunlight.geomys.org+a3e00fe2+BNy/co4C1Hn1p+INwJrfUlgz7W55dSZReusH/GhUhJ/G"
+  ],
+  "witness_quorum": 4,
+  "algorithms": {
+    "checkpoint": "c2sp.org/tlog-checkpoint",
+    "cosignature": "c2sp.org/tlog-cosignature (cosignature/v1, alg 0x04)",
+    "tree": "RFC 6962 / SHA-256",
+    "tiles": "c2sp.org/tlog-tiles",
+    "canonicalization": "RFC 8785",
+    "note": "ed25519 is the authenticating algorithm; additive post-quantum cosignatures may appear on checkpoints and are not required for quorum"
+  },
+  "valid_from": "2026-08-03T01:30:00Z",
+  "valid_until": "2027-02-03T01:30:00Z",
+  "previous_manifest_sha256": null,
+  "rotation_rule": "log key rotation is valid only if recorded in-log as a log-key-rotation/v1 leaf; revocation as log-key-revocation/v1; a successor manifest MUST carry previous_manifest_sha256 of this manifest, MUST be signed by an ed25519 log key valid under its predecessor (or cite the rotation leaf index that replaced it), and MUST appear at https://markovianprotocol.com/.well-known/trust-root/<version>.json",
+  "publication": {
+    "versioned": "https://markovianprotocol.com/.well-known/trust-root/1.json",
+    "latest": "https://markovianprotocol.com/.well-known/trust-root.json",
+    "log_leaf": "the sha256 of the RFC 8785 canonicalization of this manifest WITHOUT the signature field is appended to the log as a trust-root-manifest/v1 leaf"
+  },
+  "signature": {
+    "alg": "ed25519",
+    "key_id": "0302c6c8",
+    "signed_over": "RFC 8785 canonicalization of the manifest without this signature field",
+    "sig": "jXrcYRYUiUP0TotLn51/KNYfmp0O6XQUttnINm7GT6GOcEdJBg1uVfY3y9DuWEQYJNQ6XtYqsQccE8FoxDpHCw=="
+  }
+}
