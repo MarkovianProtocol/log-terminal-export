@@ -390,6 +390,49 @@ def stated_quorum():
         return None
 
 
+def check_manifest(leaves, size, root_b64):
+    """manifest.json describes this bundle in prose and numbers. Nothing else here
+    reads it, so until now a wrong number in it verified clean: an export shipped
+    with leaves_exported=76 beside 7578 real leaves and this verifier passed it.
+    A reader who trusts the manifest and a reader who recomputes would then have
+    been told different things by the same bundle, which is the one failure this
+    whole artifact exists to prevent. Every field that restates a fact the bundle
+    carries is checked against the bundle."""
+    try:
+        m = json.loads(_read("manifest.json").decode())
+    except Exception as e:
+        print("FAIL manifest.json unreadable: %r" % (e,))
+        return False
+
+    good = True
+    checks = [("final_tree_size", size),
+              ("leaves_exported", len(leaves)),
+              ("final_root_b64", root_b64)]
+    for field, actual in checks:
+        stated = m.get(field)
+        if stated is None:
+            print("FAIL manifest.json has no %s" % field)
+            good = False
+        elif stated != actual:
+            print("FAIL manifest.json says %s=%r; this bundle has %r"
+                  % (field, stated, actual))
+            good = False
+
+    n_anchors = 0
+    d = os.path.join(HERE, "anchors")
+    if os.path.isdir(d):
+        n_anchors = len([f for f in os.listdir(d) if f.endswith(".checkpoint")])
+    if m.get("anchored_checkpoints") != n_anchors:
+        print("FAIL manifest.json says anchored_checkpoints=%r; anchors/ holds %d"
+              % (m.get("anchored_checkpoints"), n_anchors))
+        good = False
+
+    if good:
+        print("PASS manifest.json agrees with the bundle "
+              "(size, leaf count, root, anchor count)")
+    return good
+
+
 def check_anchored_history(leaves, keys):
     """Every anchored checkpoint must be a prefix of *these* leaves.
 
@@ -630,6 +673,8 @@ def main():
         print("inclusion proof for leaf %d: %s"
               % (i, "PASS" if h == computed else "FAIL"))
         ok = ok and h == computed
+
+    ok = check_manifest(leaves, size, root_b64) and ok
 
     ok = check_anchored_history(leaves, keys) and ok
 
