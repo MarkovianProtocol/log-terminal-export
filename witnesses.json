@@ -61,5 +61,12 @@
     "independent": true,
     "enabled": false,
     "note": "Kaveh/Whisper. Offered reciprocal cosigning. Blocked until Colin sends him origin + checkpoint vkey + checkpoint URL. Not Claude's to send."
+  },
+  {
+    "name": "gblin/witness",
+    "add_checkpoint": "https://gblin-mcp.gblin-mcp-worker.workers.dev/witness/add-checkpoint",
+    "independent": true,
+    "enabled": true,
+    "note": "GBLIN Protocol. Checks our note signature against the key pinned from our root page plus an RFC 6962 consistency proof before signing. Cosignature verified independently 2026-08-18 at size 7455. NOT in tlog.policy or the trust-root manifest: it cosigns us, it carries no quorum weight until the next manifest rotation."
   }
 ]
