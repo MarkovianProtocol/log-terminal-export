@@ -6,7 +6,7 @@
  "leaves_exported": 7731,
  "checkpoint_lines": 17,
  "anchored_checkpoints": 783,
- "exported_at_unix": 1788205803,
+ "exported_at_unix": 1788209402,
  "verify": "python3 verify_export.py  (stdlib only, no network)",
  "proves": [
   "that these leaf bytes, in this order, produce the final root",
