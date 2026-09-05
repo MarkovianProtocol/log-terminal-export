@@ -5,8 +5,8 @@
  "final_root_b64": "oZKoMxt3dQyFsEEJoh7fiOEazmwvQNw05GLwgfV+ZTE=",
  "leaves_exported": 7839,
  "checkpoint_lines": 17,
- "anchored_checkpoints": 812,
- "exported_at_unix": 1788619802,
+ "anchored_checkpoints": 813,
+ "exported_at_unix": 1788623403,
  "verify": "python3 verify_export.py  (stdlib only, no network)",
  "proves": [
   "that these leaf bytes, in this order, produce the final root",
@@ -14,7 +14,7 @@
   "that the listed witnesses cosigned the same root from size 250 onward - the 41 anchored checkpoints below that size carry no cosignature and rest on the log's own key alone",
   "that any receipt naming an index <= final_tree_size can be rechecked against this frozen tree",
   "that every anchored checkpoint in anchors/ is a prefix of these exact leaves - its root equals the recomputed root at its own stated size, under a verifying log signature - so the whole anchored history is tied to these bytes rather than only the final head",
-  "that every cosignature in anchors/ names a verifier key shipped inside this bundle - 5525 Ed25519 lines against witness_keys.json and 1542 ML-DSA-44 lines against pq_keys.json - so nothing here needs a network, or our word, to check"
+  "that every cosignature in anchors/ names a verifier key shipped inside this bundle - 5533 Ed25519 lines against witness_keys.json and 1544 ML-DSA-44 lines against pq_keys.json - so nothing here needs a network, or our word, to check"
  ],
  "does_not_prove": [
   "that the recorded claims are true",
