@@ -1,12 +1,12 @@
 {
  "what": "terminal export of an append-only transparency log",
  "origin": "markovianprotocol.com/log",
- "final_tree_size": 7848,
- "final_root_b64": "EYM1Ht65Xj3OY7soTCY5KeU+kCBIR4RHlgmYtbiv/i0=",
- "leaves_exported": 7848,
+ "final_tree_size": 7849,
+ "final_root_b64": "z/WRdQCpXhdrSZlZToT8Ypcj8g03nGddYABp/KIafNg=",
+ "leaves_exported": 7849,
  "checkpoint_lines": 17,
  "anchored_checkpoints": 821,
- "exported_at_unix": 1788727804,
+ "exported_at_unix": 1788731403,
  "verify": "python3 verify_export.py  (stdlib only, no network)",
  "proves": [
   "that these leaf bytes, in this order, produce the final root",
