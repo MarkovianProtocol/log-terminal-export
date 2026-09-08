@@ -378,6 +378,33 @@ def pq_keys():
     return out
 
 
+def rooted_names():
+    """The witness names the SIGNED trust root vouches for.
+
+    witness_keys.json is an unsigned convenience file: it ships every key needed
+    to check every line on a checkpoint, and a log may be cosigned by a witness
+    its manifest does not cover. Counting those toward the quorum would let an
+    unsigned file raise the quorum's roof -- the number would come from the
+    signed manifest while the key set came from beside it. Returns None when no
+    trust root is present, in which case the quorum is UNSTATED and the bundle
+    fails on that ground anyway."""
+    try:
+        d = json.loads(_read("trust-root.json").decode())
+        return {v.split("+")[0] for v in d["witness_vkeys"]}
+    except Exception:
+        return None
+
+
+def split_by_root(names):
+    """(quorum_bearing, advisory) -- advisory cosignatures verify but are not in
+    the signed trust root, so they are reported and never counted."""
+    rooted = rooted_names()
+    if rooted is None:
+        return list(names), []
+    return ([n for n in names if n in rooted],
+            [n for n in names if n not in rooted])
+
+
 def stated_quorum():
     """The witness quorum this log published for itself. A bundle that states no
     policy cannot be checked against one, so its absence is a failure rather
@@ -486,7 +513,7 @@ def check_anchored_history(leaves, keys):
                           % (f, show(r), show(base64.b64encode(roots[n]).decode())))
         body = chr(10).join(text.split(chr(10))[:3]) + chr(10)
         _, ind, _, _, _ = classify(ss, o, body, keys)
-        witnessed[n] = len(ind)
+        witnessed[n] = len(split_by_root(ind)[0])
         if not any(sig_ok(body, l, keys) for l in ss
                    if l.split(" ", 2)[1:2] == [o]):
             unsigned.append(f)
@@ -595,8 +622,12 @@ def main():
     log_ok, independent, failed, unverifiable, malformed = classify(
         sigs, origin, body, keys)
 
+    independent, advisory = split_by_root(independent)
     for name in independent:
         print("  PASS  %-52s independent witness" % name[:52])
+    for name in advisory:
+        print("  ----  %-52s verifies, but the signed trust root does not "
+              "name it: not counted" % name[:52])
     if log_ok:
         print("  PASS  %-52s the log's own key" % origin[:52])
     for name in failed:
@@ -636,6 +667,10 @@ def main():
     print("log signature: %s" % ("verifies" if log_ok else "MISSING"))
     print("independent witness cosignatures verified: %d (quorum %s)"
           % (len(independent), quorum if quorum is not None else "UNSTATED"))
+    if advisory:
+        print("   ...and %d verified cosignature(s) not named by the signed "
+              "trust root, excluded from that count: %s"
+              % (len(advisory), ", ".join(sorted(advisory))))
     hosts = distinct_hosts(independent)
     print("   ...held by %d distinct host name(s): %s"
           % (len(hosts), ", ".join(sorted(hosts))))
