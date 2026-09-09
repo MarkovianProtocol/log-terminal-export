@@ -1,46 +1,47 @@
 {
- "_note": "Pinned Ed25519 witness verifier keys, in c2sp vkey form name+keyid+base64(0x04||pubkey). Each collected from the witness operator's OWN published key page (cited). submit_witnesses.py verifies every returned cosignature against these before publishing it; an unpinned or failing cosignature is NOT published. To add a witness, pin its key here first.",
- "keys": [
-  {
-   "vkey": "witness.stagemole.eu+67f7aea0+BEqSG3yu9YrmcM3BHvQYTxwFj3uSWakQepafafpUqklv",
-   "src": "https://witness.stagemole.eu/about",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "transparency.dev/DEV:witness-little-garden+d8042a87+BCtusOxINQNUTN5Oj8HObRkh2yHf/MwYaGX4CPdiVEPM",
-   "src": "https://transparency.dev/witnesses/",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "staging.witness.transparency.goog/ring-any-bells+2e1a8dc9+BG5JTpLc3FJtwzgh1Uv+Qelz9qeOH2bfWjS1s0s+y4rL",
-   "src": "https://transparency.dev/witnesses/",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "rgdd.se/poc-witness+db03732e+BCjJKlo6BU0xfIb8LutqerIFTWIXEA0L5n3tW3QyPFgG",
-   "src": "https://www.rgdd.se/poc-witness/about",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "witness1.smartit.nu/witness1+a48c820f+BPSFWg9G6KPiO7QPryYO5Xq4oYJJ+kAvLKLSimDhoxMO",
-   "src": "https://witness1.smartit.nu/witness1/about.txt",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "remora.n621.de+da77ade7+BOvN63jn/bLvkieywe8R6UYAtVtNbZpXh34x7onlmtw2",
-   "src": "https://remora.n621.de/",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "witness.navigli.sunlight.geomys.org+a3e00fe2+BNy/co4C1Hn1p+INwJrfUlgz7W55dSZReusH/GhUhJ/G",
-   "src": "https://navigli.sunlight.geomys.org/",
-   "in_trust_root": true
-  },
-  {
-   "vkey": "gblin.digital/witness+c335a002+BF54nC8Q1wHAlKirQexRC5phxjLtbEhcq8udv8TXPwXx",
-   "src": "https://gblin-mcp.gblin-mcp-worker.workers.dev/witness",
-   "in_trust_root": false
-  }
- ],
- "note": "in_trust_root marks whether trust-root.json, the signed manifest, names this witness. Every key here is shipped so that every cosignature line on a checkpoint can be checked; only the ones the manifest names count toward witness_quorum. This file is not itself signed, so it must not be able to widen the quorum's key set."
+  "_note": "Pinned Ed25519 witness verifier keys, in c2sp vkey form name+keyid+base64(0x04||pubkey). Each collected from the witness operator's OWN published key page (cited). submit_witnesses.py verifies every returned cosignature against these before publishing it; an unpinned or failing cosignature is NOT published. To add a witness, pin its key here first. One pinned key is not named by the signed trust root: it is marked in_trust_root false and carries a why. A cosignature from it verifies, and it is never counted toward the quorum, which is counted only over keys the signed root names.",
+  "keys": [
+    {
+      "vkey": "witness.stagemole.eu+67f7aea0+BEqSG3yu9YrmcM3BHvQYTxwFj3uSWakQepafafpUqklv",
+      "src": "https://witness.stagemole.eu/about",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "transparency.dev/DEV:witness-little-garden+d8042a87+BCtusOxINQNUTN5Oj8HObRkh2yHf/MwYaGX4CPdiVEPM",
+      "src": "https://transparency.dev/witnesses/",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "staging.witness.transparency.goog/ring-any-bells+2e1a8dc9+BG5JTpLc3FJtwzgh1Uv+Qelz9qeOH2bfWjS1s0s+y4rL",
+      "src": "https://transparency.dev/witnesses/",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "rgdd.se/poc-witness+db03732e+BCjJKlo6BU0xfIb8LutqerIFTWIXEA0L5n3tW3QyPFgG",
+      "src": "https://www.rgdd.se/poc-witness/about",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "witness1.smartit.nu/witness1+a48c820f+BPSFWg9G6KPiO7QPryYO5Xq4oYJJ+kAvLKLSimDhoxMO",
+      "src": "https://witness1.smartit.nu/witness1/about.txt",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "remora.n621.de+da77ade7+BOvN63jn/bLvkieywe8R6UYAtVtNbZpXh34x7onlmtw2",
+      "src": "https://remora.n621.de/",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "witness.navigli.sunlight.geomys.org+a3e00fe2+BNy/co4C1Hn1p+INwJrfUlgz7W55dSZReusH/GhUhJ/G",
+      "src": "https://navigli.sunlight.geomys.org/",
+      "in_trust_root": true
+    },
+    {
+      "vkey": "gblin.digital/witness+c335a002+BF54nC8Q1wHAlKirQexRC5phxjLtbEhcq8udv8TXPwXx",
+      "src": "https://gblin-mcp.gblin-mcp-worker.workers.dev/witness",
+      "in_trust_root": false,
+      "why": "Cosigning since 2026-08-22, verified on every checkpoint, and absent from trust-root.json v2, which was signed before this witness existed. Carries no quorum weight until a v3 manifest names it. v3 is built and waiting on its offline signature; until then this key is published, verified and excluded from the count on purpose, rather than quietly counted or quietly dropped. Flagged from outside by rackp-dev in c2pa-org/specifications#122 on 2026-08-24."
+    }
+  ],
+  "note": "in_trust_root marks whether trust-root.json, the signed manifest, names this witness. Every key here is shipped so that every cosignature line on a checkpoint can be checked; only the ones the manifest names count toward witness_quorum. This file is not itself signed, so it must not be able to widen the quorum's key set."
 }
