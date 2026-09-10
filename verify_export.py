@@ -448,6 +448,7 @@ def use_hint(w: Poly, h: list[int], p: _Parameters) -> list[int]:
 ZETAS = [1, 4808194, 3765607, 3761513, 5178923, 5496691, 5234739, 5178987, 7778734, 3542485, 2682288, 2129892, 3764867, 7375178, 557458, 7159240, 5010068, 4317364, 2663378, 6705802, 4855975, 7946292, 676590, 7044481, 5152541, 1714295, 2453983, 1460718, 7737789, 4795319, 2815639, 2283733, 3602218, 3182878, 2740543, 4793971, 5269599, 2101410, 3704823, 1159875, 394148, 928749, 1095468, 4874037, 2071829, 4361428, 3241972, 2156050, 3415069, 1759347, 7562881, 4805951, 3756790, 6444618, 6663429, 4430364, 5483103, 3192354, 556856, 3870317, 2917338, 1853806, 3345963, 1858416, 3073009, 1277625, 5744944, 3852015, 4183372, 5157610, 5258977, 8106357, 2508980, 2028118, 1937570, 4564692, 2811291, 5396636, 7270901, 4158088, 1528066, 482649, 1148858, 5418153, 7814814, 169688, 2462444, 5046034, 4213992, 4892034, 1987814, 5183169, 1736313, 235407, 5130263, 3258457, 5801164, 1787943, 5989328, 6125690, 3482206, 4197502, 7080401, 6018354, 7062739, 2461387, 3035980, 621164, 3901472, 7153756, 2925816, 3374250, 1356448, 5604662, 2683270, 5601629, 4912752, 2312838, 7727142, 7921254, 348812, 8052569, 1011223, 6026202, 4561790, 6458164, 6143691, 1744507, 1753, 6444997, 5720892, 6924527, 2660408, 6600190, 8321269, 2772600, 1182243, 87208, 636927, 4415111, 4423672, 6084020, 5095502, 4663471, 8352605, 822541, 1009365, 5926272, 6400920, 1596822, 4423473, 4620952, 6695264, 4969849, 2678278, 4611469, 4829411, 635956, 8129971, 5925040, 4234153, 6607829, 2192938, 6653329, 2387513, 4768667, 8111961, 5199961, 3747250, 2296099, 1239911, 4541938, 3195676, 2642980, 1254190, 8368000, 2998219, 141835, 8291116, 2513018, 7025525, 613238, 7070156, 6161950, 7921677, 6458423, 4040196, 4908348, 2039144, 6500539, 7561656, 6201452, 6757063, 2105286, 6006015, 6346610, 586241, 7200804, 527981, 5637006, 6903432, 1994046, 2491325, 6987258, 507927, 7192532, 7655613, 6545891, 5346675, 8041997, 2647994, 3009748, 5767564, 4148469, 749577, 4357667, 3980599, 2569011, 6764887, 1723229, 1665318, 2028038, 1163598, 5011144, 3994671, 8368538, 7009900, 3020393, 3363542, 214880, 545376, 7609976, 3105558, 7277073, 508145, 7826699, 860144, 3430436, 140244, 6866265, 6195333, 3123762, 2358373, 6187330, 5365997, 6663603, 2926054, 7987710, 8077412, 3531229, 4405932, 4606686, 1900052, 7598542, 1054478, 7648983]  # fmt: skip  # ruff: ignore[line-too-long]
 
 import os
+import struct
 import base64
 import hashlib
 import json
@@ -627,6 +628,172 @@ _EM_DASH = "—"
 _LOG_ALG = 0x01          # Ed25519 log signature
 _COSIG_ALG = 0x04        # Ed25519 cosignature/v1 (domain-separated from 0x01)
 
+
+"""OpenTimestamps proof parsing and replay. Stdlib only.
+
+An .ots proof is a hash chain: start from the digest of the file, apply a list of
+append/prepend/hash operations, and arrive at a value that some attestation
+claims is committed somewhere. For a Bitcoin attestation, that value is a block's
+merkle root and the attestation names the height.
+
+This module does the replay. It does not fetch anything, and it does not decide
+whether a block is real -- see verify_anchors.py for that half.
+
+Format: https://github.com/opentimestamps/python-opentimestamps
+"""
+import hashlib
+
+MAGIC = (b"\x00OpenTimestamps\x00\x00Proof\x00"
+         b"\xbf\x89\xe2\xe8\x84\xe8\x92\x94")
+
+OP_SHA1 = 0x02
+OP_RIPEMD160 = 0x03
+OP_SHA256 = 0x08
+OP_KECCAK256 = 0x67
+OP_APPEND = 0xf0
+OP_PREPEND = 0xf1
+OP_REVERSE = 0xf2
+OP_HEXLIFY = 0xf3
+OP_FORK = 0xff
+OP_ATTESTATION = 0x00
+
+TAG_BITCOIN = bytes.fromhex("0588960d73d71901")
+TAG_PENDING = bytes.fromhex("83dfe30d2ef90c8e")
+TAG_LITECOIN = bytes.fromhex("06869a0d73d71b45")
+TAG_ETHEREUM = bytes.fromhex("30fe8087b5c7ead7")
+
+TAG_NAMES = {
+    TAG_BITCOIN: "bitcoin",
+    TAG_PENDING: "pending",
+    TAG_LITECOIN: "litecoin",
+    TAG_ETHEREUM: "ethereum",
+}
+
+
+class OTSError(Exception):
+    pass
+
+
+class _Reader:
+    def __init__(self, buf):
+        self.buf = buf
+        self.i = 0
+
+    def byte(self):
+        if self.i >= len(self.buf):
+            raise OTSError("truncated proof")
+        b = self.buf[self.i]
+        self.i += 1
+        return b
+
+    def take(self, n):
+        if self.i + n > len(self.buf):
+            raise OTSError("truncated proof")
+        out = self.buf[self.i:self.i + n]
+        self.i += n
+        return out
+
+    def varuint(self):
+        val, shift = 0, 0
+        while True:
+            b = self.byte()
+            val |= (b & 0x7f) << shift
+            if not b & 0x80:
+                return val
+            shift += 7
+            if shift > 63:
+                raise OTSError("varuint too long")
+
+    def varbytes(self):
+        return self.take(self.varuint())
+
+    def done(self):
+        return self.i >= len(self.buf)
+
+
+def _ripemd160(b):
+    try:
+        h = hashlib.new("ripemd160")
+    except ValueError:
+        raise OTSError("ripemd160 unavailable in this Python's hashlib")
+    h.update(b)
+    return h.digest()
+
+
+def _apply(op, arg, msg):
+    if op == OP_APPEND:
+        return msg + arg
+    if op == OP_PREPEND:
+        return arg + msg
+    if op == OP_REVERSE:
+        return msg[::-1]
+    if op == OP_HEXLIFY:
+        return msg.hex().encode()
+    if op == OP_SHA256:
+        return hashlib.sha256(msg).digest()
+    if op == OP_SHA1:
+        return hashlib.sha1(msg).digest()
+    if op == OP_RIPEMD160:
+        return _ripemd160(msg)
+    if op == OP_KECCAK256:
+        raise OTSError("keccak256 is not in the standard library")
+    raise OTSError("unknown operation 0x%02x" % op)
+
+
+def _walk(r, msg, out):
+    """Replay one branch, recording every attestation it reaches."""
+    while True:
+        if r.done():
+            return
+        op = r.byte()
+        if op == OP_FORK:
+            # Each branch continues from the same message. Parse them in turn;
+            # the last one runs on after the fork ends.
+            _walk(r, msg, out)
+            continue
+        if op == OP_ATTESTATION:
+            tag = r.take(8)
+            payload = r.varbytes()
+            rec = {"tag": tag, "name": TAG_NAMES.get(tag, "unknown:" + tag.hex()),
+                   "message": msg}
+            if tag == TAG_BITCOIN:
+                rec["height"] = _Reader(payload).varuint()
+            elif tag == TAG_PENDING:
+                rec["uri"] = _Reader(payload).varbytes().decode("utf-8", "replace")
+            out.append(rec)
+            return
+        arg = b""
+        if op in (OP_APPEND, OP_PREPEND):
+            arg = r.varbytes()
+        msg = _apply(op, arg, msg)
+
+
+def parse(data):
+    """Return (file_digest, attestations).
+
+    Each attestation is a dict with name, message (the value it commits to), and
+    for bitcoin a height. `message` for a bitcoin attestation is the block's
+    merkle root, in internal byte order.
+    """
+    if not data.startswith(MAGIC):
+        raise OTSError("not an OpenTimestamps proof")
+    r = _Reader(data[len(MAGIC):])
+    version = r.varuint()
+    if version != 1:
+        raise OTSError("unsupported proof version %d" % version)
+    op = r.byte()
+    sizes = {OP_SHA1: 20, OP_RIPEMD160: 20, OP_SHA256: 32, OP_KECCAK256: 32}
+    if op not in sizes:
+        raise OTSError("unknown file hash operation 0x%02x" % op)
+    digest = r.take(sizes[op])
+    out = []
+    _walk(r, digest, out)
+    return digest, out
+
+
+def bitcoin_attestations(data):
+    digest, ats = parse(data)
+    return digest, [a for a in ats if a["tag"] == TAG_BITCOIN]
 
 
 def prefix_roots(leaves, wanted):
@@ -1013,12 +1180,95 @@ def check_anchored_history(leaves, keys):
             print("  PASS  all %d carry %d or more independent cosignatures"
                   % (len(names), quorum))
     if unstamped:
-        # Presence of an .ots is all this tool checks -- verifying an
-        # OpenTimestamps attestation needs Bitcoin headers and a network, and
-        # this verifier has neither. See does_not_prove in manifest.json.
         print("  note  %d without an OpenTimestamps proof file: %s"
               % (len(unstamped), _elide(unstamped)))
+    ok = verify_anchor_proofs(names) and ok
     return ok
+
+
+def sha256d(b):
+    return hashlib.sha256(hashlib.sha256(b).digest()).digest()
+
+
+def _bits_to_target(bits):
+    e, m = bits >> 24, bits & 0xffffff
+    return m >> (8 * (3 - e)) if e <= 3 else m << (8 * (e - 3))
+
+
+def verify_anchor_proofs(names):
+    """Replay each OpenTimestamps proof and check it against shipped headers.
+
+    Verifying an attestation needs Bitcoin headers, not a network. A header is
+    80 bytes, so they ship here. What this cannot settle is whether these
+    headers are the main chain: a linked run meeting its own difficulty is work,
+    not consensus.
+    """
+    try:
+        raw = _read("headers.bin")
+        meta = json.loads(_read("headers.json").decode())
+    except Exception:
+        print("  ----  no headers.bin in this bundle, so the OpenTimestamps "
+              "proofs cannot be checked here")
+        return True
+    start, count = meta["start_height"], len(raw) // 80
+    def hdr(h):
+        i = h - start
+        return raw[i * 80:(i + 1) * 80] if 0 <= i < count else None
+
+    broken = weak = 0
+    prev = None
+    for i in range(count):
+        h = raw[i * 80:(i + 1) * 80]
+        if prev is not None and h[4:36] != sha256d(prev):
+            broken += 1
+        if int.from_bytes(sha256d(h)[::-1], "big") > _bits_to_target(
+                int.from_bytes(h[72:76], "little")):
+            weak += 1
+        prev = h
+    print("  %s  %d block headers: chain linkage %s, proof of work %s"
+          % ("PASS" if not (broken or weak) else "FAIL", count,
+             "intact" if not broken else "BROKEN at %d" % broken,
+             "valid" if not weak else "SHORT at %d" % weak))
+
+    good = bad = outside = pending = 0
+    for name in names:
+        try:
+            proof = _read(os.path.join("anchors", name + ".ots"))
+        except Exception:
+            continue
+        try:
+            digest, ats = bitcoin_attestations(proof)
+        except Exception:
+            bad += 1
+            continue
+        if hashlib.sha256(_read(os.path.join("anchors", name))).digest() != digest:
+            bad += 1
+            continue
+        if not ats:
+            pending += 1
+            continue
+        hit = False
+        for at in ats:
+            h = hdr(at["height"])
+            if h is None:
+                outside += 1
+            elif h[36:68] == at["message"]:
+                hit = True
+            else:
+                bad += 1
+        if hit:
+            good += 1
+    if bad:
+        print("  FAIL  %d anchor proof(s) do not replay to the merkle root in "
+              "those headers (%d do)" % (bad, good))
+    else:
+        print("  PASS  %d anchor proof(s) replay to a merkle root in those "
+              "headers" % good)
+    if pending:
+        print("  ----  %d still pending a Bitcoin attestation" % pending)
+    if outside:
+        print("  ----  %d name a height outside the shipped headers" % outside)
+    return bad == 0
 
 
 def main():
