@@ -1,6 +1,6 @@
 {
   "start_height": 957788,
-  "count": 8859,
+  "count": 8877,
   "source": "https://blockstream.info/api",
   "note": "80-byte Bitcoin block headers, ascending from start_height, no gaps. Fetched once at build time; verification is offline and re-checks the prev-block linkage and the proof of work rather than trusting this file's provenance."
 }
