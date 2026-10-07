@@ -796,6 +796,15 @@ def bitcoin_attestations(data):
     return digest, [a for a in ats if a["tag"] == TAG_BITCOIN]
 
 
+def b64_strict(s):
+    """C2SP (Oct 2026): base64 MUST be canonical, RFC 4648 section 3.5. Decode, then
+    require the text to be exactly what the bytes re-encode to; unused trailing bits,
+    missing padding and stray characters are all refused."""
+    raw = base64.b64decode(s, validate=True)
+    if base64.b64encode(raw).decode("ascii") != s:
+        raise ValueError("non-canonical base64")
+    return raw
+
 def prefix_roots(leaves, wanted):
     """MTH(leaves[:n]) for every n in `wanted`, in one pass over the leaves.
 
@@ -867,7 +876,7 @@ def _add_vkey(out, v):
     name = parts[0]
     b = parts[2]
     try:
-        blob = base64.b64decode(b + "=" * (-len(b) % 4))
+        blob = b64_strict(b)
     except Exception:
         return
     out.setdefault(name, []).append(blob)
@@ -901,7 +910,7 @@ def sig_ok(body, sig_line, keys):
         return False
     name = parts[1]
     try:
-        blob = base64.b64decode(parts[2])
+        blob = b64_strict(parts[2])
     except Exception:
         return False
     for kb in keys.get(name, []):
@@ -950,7 +959,7 @@ def classify(sigs, origin, body, keys):
         parts = line.split(" ", 2)
         name = parts[1] if len(parts) > 2 else "?"
         try:
-            blen = len(base64.b64decode(parts[2]))
+            blen = len(b64_strict(parts[2]))
         except Exception:
             blen = -1
         if blen == _ML_DSA_44_COSIG:
@@ -985,7 +994,7 @@ def pq_keys():
     for e in d.get("keys", []):
         try:
             name, _, b64 = e["vkey"].split("+", 2)
-            blob = base64.b64decode(b64 + "=" * (-len(b64) % 4))
+            blob = b64_strict(b64)
             kid = hashlib.sha256(name.encode() + b"\x0a" + blob[:1]
                                  + blob[1:]).digest()[:4]
             out[name] = (kid, blob[0], blob[1:])
@@ -1342,7 +1351,7 @@ def main():
             continue
         name = parts[1]
         try:
-            blob = base64.b64decode(parts[2])
+            blob = b64_strict(parts[2])
         except Exception:
             continue
         if len(blob) != _ML_DSA_44_COSIG:
@@ -1360,7 +1369,7 @@ def main():
                     + bytes([len(origin)]) + origin.encode()
                     + (0).to_bytes(8, "big")
                     + size.to_bytes(8, "big")
-                    + base64.b64decode(root_b64))
+                    + b64_strict(root_b64))
             try:
                 VerificationKey(pq[name][2]).verify(blob[12:], _msg)
                 pq_verified += 1
