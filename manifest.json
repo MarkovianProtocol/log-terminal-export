@@ -1,12 +1,12 @@
 {
  "what": "terminal export of an append-only transparency log",
  "origin": "markovianprotocol.com/log",
- "final_tree_size": 9622,
- "final_root_b64": "n4iUzt2KBUKnbi6tcmQHWv0ELD5jIlpkkAxa2kvzEkg=",
- "leaves_exported": 9622,
+ "final_tree_size": 9623,
+ "final_root_b64": "ePd7VcCEB5+jmlGDIgj1Cs4bzvBJ9/lIiRW5cphoNTM=",
+ "leaves_exported": 9623,
  "checkpoint_lines": 18,
- "anchored_checkpoints": 1549,
- "exported_at_unix": 1791597004,
+ "anchored_checkpoints": 1550,
+ "exported_at_unix": 1791600605,
  "verify": "python3 verify_export.py  (stdlib only, no network)",
  "proves": [
   "that these leaf bytes, in this order, produce the final root",
@@ -14,7 +14,7 @@
   "that the listed witnesses cosigned the same root from size 250 onward - the 41 anchored checkpoints below that size carry no cosignature and rest on the log's own key alone",
   "that any receipt naming an index <= final_tree_size can be rechecked against this frozen tree",
   "that every anchored checkpoint in anchors/ is a prefix of these exact leaves - its root equals the recomputed root at its own stated size, under a verifying log signature - so the whole anchored history is tied to these bytes rather than only the final head",
-  "that every cosignature in anchors/ names a verifier key shipped inside this bundle - 11579 Ed25519 lines against witness_keys.json and 3015 ML-DSA-44 lines against pq_keys.json - so nothing here needs a network, or our word, to check"
+  "that every cosignature in anchors/ names a verifier key shipped inside this bundle - 11588 Ed25519 lines against witness_keys.json and 3017 ML-DSA-44 lines against pq_keys.json - so nothing here needs a network, or our word, to check"
  ],
  "does_not_prove": [
   "that the recorded claims are true",
