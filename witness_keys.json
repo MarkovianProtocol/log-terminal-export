@@ -43,13 +43,8 @@
    "why": "Cosigning since 2026-08-22, verified on every checkpoint, and absent from trust-root.json v2, which was signed before this witness existed. Carries no quorum weight until a v3 manifest names it. v3 is built and waiting on its offline signature; until then this key is published, verified and excluded from the count on purpose, rather than quietly counted or quietly dropped. Flagged from outside by rackp-dev in c2pa-org/specifications#122 on 2026-08-24."
   },
   {
-   "vkey": "whisper.online/witness/ns1+6a58da87+BANUBZXBS/7WhHsjIoGQ5lrdXNVczG/Nx1Y0Z/T4/wVg",
-   "src": "https://ns1.whisper.online/witness/key",
-   "in_trust_root": false
-  },
-  {
-   "vkey": "whisper.online/witness/ns2+8116f75c+BNRtcGDJEno+ZjneJNeIi7mKMzWgRMnQYKmdTzPZuufs",
-   "src": "https://ns2.whisper.online/witness/key",
+   "vkey": "whisper.online/witness+25aef676+BMXtkY/wfbHppAEEBMs0x9NdEEYZi3kj8JZMvy/28JWI",
+   "src": "https://whisper.online/ledger/witness/key",
    "in_trust_root": false
   }
  ],
