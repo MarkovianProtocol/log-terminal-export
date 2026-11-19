@@ -1,0 +1,59 @@
+{
+  "manifest": "markovian-trust-root/v2",
+  "version": 2,
+  "origin": "markovianprotocol.com/log",
+  "log_vkeys": {
+    "ed25519": "markovianprotocol.com/log+0302c6c8+ATkpOWo95UuEiW2EhNZAol4f0CS8hMluJfPcTSzrr03v"
+  },
+  "manifest_vkeys": {
+    "threshold": 1,
+    "keys": [
+      "markovianprotocol.com/trust-root+e02f9d7a+AQlCAObmffOkdW+KmJXk2DoKTFJJIxe7fdZmsTogvraY"
+    ],
+    "note": "offline manifest key(s); the TUF root rule -- the root of trust is the least-used key. Successor manifests are valid only with threshold signatures under BOTH the predecessor's and their own key set (for version 1 the log key stands in, as it was version 1's only key)."
+  },
+  "witness_vkeys": [
+    "witness.stagemole.eu+67f7aea0+BEqSG3yu9YrmcM3BHvQYTxwFj3uSWakQepafafpUqklv",
+    "transparency.dev/DEV:witness-little-garden+d8042a87+BCtusOxINQNUTN5Oj8HObRkh2yHf/MwYaGX4CPdiVEPM",
+    "staging.witness.transparency.goog/ring-any-bells+2e1a8dc9+BG5JTpLc3FJtwzgh1Uv+Qelz9qeOH2bfWjS1s0s+y4rL",
+    "rgdd.se/poc-witness+db03732e+BCjJKlo6BU0xfIb8LutqerIFTWIXEA0L5n3tW3QyPFgG",
+    "witness1.smartit.nu/witness1+a48c820f+BPSFWg9G6KPiO7QPryYO5Xq4oYJJ+kAvLKLSimDhoxMO",
+    "remora.n621.de+da77ade7+BOvN63jn/bLvkieywe8R6UYAtVtNbZpXh34x7onlmtw2",
+    "witness.navigli.sunlight.geomys.org+a3e00fe2+BNy/co4C1Hn1p+INwJrfUlgz7W55dSZReusH/GhUhJ/G"
+  ],
+  "witness_quorum": 4,
+  "algorithms": {
+    "checkpoint": "c2sp.org/tlog-checkpoint",
+    "cosignature": "c2sp.org/tlog-cosignature (cosignature/v1, alg 0x04)",
+    "tree": "RFC 6962 / SHA-256",
+    "tiles": "c2sp.org/tlog-tiles",
+    "canonicalization": "RFC 8785",
+    "note": "ed25519 is the authenticating algorithm; additive post-quantum cosignatures may appear on checkpoints and are not required for quorum"
+  },
+  "valid_from": "2026-08-03T02:14:00Z",
+  "valid_until": "2027-02-02T02:14:00Z",
+  "previous_manifest_sha256": "0a3269d699d03d5d4ecd95d7a5824b5f83c6c6a22783cb26534a9a6008344e2d",
+  "rotation_rule": "a successor manifest MUST have version exactly one greater than this one, MUST carry previous_manifest_sha256 equal to the sha256 of the RFC 8785 canonicalization of this manifest without its signatures field, MUST carry signatures meeting the manifest_vkeys threshold of BOTH this manifest and itself, MUST appear at https://markovianprotocol.com/.well-known/trust-root/<version>.json, and its unsigned digest MUST be appended to the log as a trust-root-manifest/v1 leaf covered by a checkpoint cosigned by at least witness_quorum listed witnesses. Clients walk forward one version at a time and check expiry ONLY on the final manifest; an expired final manifest is a hard failure, including a pinned copy. If log_vkeys change between manifests, clients MUST discard cached checkpoints. Log key rotation is valid only if recorded in-log as a log-key-rotation/v1 leaf; revocation as log-key-revocation/v1. Past the manifest_vkeys threshold, recovery is out-of-band.",
+  "publication": {
+    "versioned": "https://markovianprotocol.com/.well-known/trust-root/2.json",
+    "latest": "https://markovianprotocol.com/.well-known/trust-root.json",
+    "leaf_hint": "https://markovianprotocol.com/.well-known/trust-root/2.json.leaf",
+    "log_leaf": "the sha256 of the RFC 8785 canonicalization of this manifest WITHOUT the signatures field is appended to the log as a trust-root-manifest/v1 leaf; 2.json.leaf is an untrusted index hint, verified via inclusion proof"
+  },
+  "signatures": [
+    {
+      "alg": "ed25519",
+      "key_name": "markovianprotocol.com/log",
+      "key_id": "0302c6c8",
+      "signed_over": "RFC 8785 canonicalization of the manifest without the signatures field",
+      "sig": "KGIQWPMXtV+/2U2U+PRy+bzwmHimc0cIeJkqao4E+qp0XLYLRUBKpL8O6AB04Vck+gIB3WPr5l+mnmIQ1y9ACQ=="
+    },
+    {
+      "alg": "ed25519",
+      "key_name": "markovianprotocol.com/trust-root",
+      "key_id": "e02f9d7a",
+      "signed_over": "RFC 8785 canonicalization of the manifest without the signatures field",
+      "sig": "vsuXqIcMMG2IVyjwFpBkC7XC6adNkyB1DjHvtTBcVxVikuyl+2vKqCQu3cG3SQ9y3DUMR5xv6PSIGprLiz/fAg=="
+    }
+  ]
+}
