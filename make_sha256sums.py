@@ -27,7 +27,7 @@ def entries():
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         for f in sorted(files):
             rel = os.path.relpath(os.path.join(root, f), HERE)
-            if rel == "SHA256SUMS" or rel in SELF_REFERENTIAL:
+            if rel in ("SHA256SUMS", "SHA256SUMS.tmp") or rel in SELF_REFERENTIAL:
                 continue
             h = hashlib.sha256(open(os.path.join(root, f), "rb").read()).hexdigest()
             yield "%s  %s\n" % (h, rel)
@@ -43,7 +43,14 @@ def main():
             return 0
         print("SHA256SUMS is stale; run make_sha256sums.py")
         return 1
-    open(path, "w").write(text)
+    # write beside, then rename: a failed write never leaves a truncated manifest
+    # (found by Ario, Nov 2026)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
     print("wrote %d entries" % text.count("\n"))
     return 0
 
